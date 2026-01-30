@@ -21,3 +21,6 @@ release
 *.apk
 *.ipa
 monorepo.md
+
+# test coverage
+coverage

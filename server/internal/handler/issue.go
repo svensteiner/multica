@@ -62,6 +62,51 @@ func issueToResponse(i db.Issue, issuePrefix string) IssueResponse {
 	}
 }
 
+// issueListRowToResponse converts a list-query row (no description) to an IssueResponse.
+func issueListRowToResponse(i db.ListIssuesRow, issuePrefix string) IssueResponse {
+	identifier := issuePrefix + "-" + strconv.Itoa(int(i.Number))
+	return IssueResponse{
+		ID:            uuidToString(i.ID),
+		WorkspaceID:   uuidToString(i.WorkspaceID),
+		Number:        i.Number,
+		Identifier:    identifier,
+		Title:         i.Title,
+		Status:        i.Status,
+		Priority:      i.Priority,
+		AssigneeType:  textToPtr(i.AssigneeType),
+		AssigneeID:    uuidToPtr(i.AssigneeID),
+		CreatorType:   i.CreatorType,
+		CreatorID:     uuidToString(i.CreatorID),
+		ParentIssueID: uuidToPtr(i.ParentIssueID),
+		Position:      i.Position,
+		DueDate:       timestampToPtr(i.DueDate),
+		CreatedAt:     timestampToString(i.CreatedAt),
+		UpdatedAt:     timestampToString(i.UpdatedAt),
+	}
+}
+
+func openIssueRowToResponse(i db.ListOpenIssuesRow, issuePrefix string) IssueResponse {
+	identifier := issuePrefix + "-" + strconv.Itoa(int(i.Number))
+	return IssueResponse{
+		ID:            uuidToString(i.ID),
+		WorkspaceID:   uuidToString(i.WorkspaceID),
+		Number:        i.Number,
+		Identifier:    identifier,
+		Title:         i.Title,
+		Status:        i.Status,
+		Priority:      i.Priority,
+		AssigneeType:  textToPtr(i.AssigneeType),
+		AssigneeID:    uuidToPtr(i.AssigneeID),
+		CreatorType:   i.CreatorType,
+		CreatorID:     uuidToString(i.CreatorID),
+		ParentIssueID: uuidToPtr(i.ParentIssueID),
+		Position:      i.Position,
+		DueDate:       timestampToPtr(i.DueDate),
+		CreatedAt:     timestampToString(i.CreatedAt),
+		UpdatedAt:     timestampToString(i.UpdatedAt),
+	}
+}
+
 func (h *Handler) ListIssues(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -93,7 +138,7 @@ func (h *Handler) ListIssues(w http.ResponseWriter, r *http.Request) {
 		prefix := h.getIssuePrefix(ctx, wsUUID)
 		resp := make([]IssueResponse, len(issues))
 		for i, issue := range issues {
-			resp[i] = issueToResponse(issue, prefix)
+			resp[i] = openIssueRowToResponse(issue, prefix)
 		}
 
 		writeJSON(w, http.StatusOK, map[string]any{
@@ -148,7 +193,7 @@ func (h *Handler) ListIssues(w http.ResponseWriter, r *http.Request) {
 	prefix := h.getIssuePrefix(ctx, wsUUID)
 	resp := make([]IssueResponse, len(issues))
 	for i, issue := range issues {
-		resp[i] = issueToResponse(issue, prefix)
+		resp[i] = issueListRowToResponse(issue, prefix)
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{

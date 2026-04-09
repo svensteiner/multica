@@ -41,6 +41,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
+    site: "@multica_hq",
+    creator: "@multica_hq",
   },
   alternates: {
     canonical: "/",
@@ -65,7 +67,7 @@ export default function RootLayout({
       <body className="h-full overflow-hidden">
         <LocaleSync />
         <ThemeProvider>
-          <QueryProvider>
+          <QueryProvider showDevtools={process.env.NEXT_PUBLIC_DEVTOOLS !== "false"}>
             <WebNavigationProvider>
               <AuthInitializer>
                 <WebWSProvider>{children}</WebWSProvider>

@@ -230,7 +230,7 @@ export const zh: LandingDict = {
         links: [
           { label: "\u6587\u6863", href: githubUrl },
           { label: "API", href: githubUrl },
-          { label: "\u793e\u533a", href: githubUrl },
+          { label: "X (Twitter)", href: "https://x.com/multica_hq" },
         ],
       },
       company: {
@@ -273,7 +273,26 @@ export const zh: LandingDict = {
     subtitle: "Multica \u7684\u6700\u65b0\u66f4\u65b0\u548c\u6539\u8fdb\u3002",
     entries: [
       {
-        version: "0.1.9",
+        version: "0.1.21",
+        date: "2026-04-09",
+        title: "项目、搜索与 Monorepo",
+        changes: [
+          "项目实体全栈 CRUD——创建、编辑项目并按项目组织 Issue",
+          "创建 Issue 弹窗新增项目选择器，CLI 新增项目命令",
+          "基于 pg_bigm 的 Issue 全文搜索",
+          "Monorepo 拆包——共享 core、UI、views 三个包（Turborepo）",
+          "全屏 Agent 执行日志视图",
+          "编辑器支持拖拽上传文件并展示文件卡片",
+          "Issue 新增附件区域，支持图片网格和文件卡片展示",
+          "运行时支持所有者追踪、筛选、头像展示和点对点更新通知",
+          "列表视图行内显示子 Issue 进度",
+          "列表视图支持已完成 Issue 分页加载",
+          "Codex 会话日志扫描以报告 token 用量",
+          "修复守护进程 repo 缓存卡在初始快照的问题",
+        ],
+      },
+      {
+        version: "0.1.20",
         date: "2026-04-08",
         title: "子 Issue、TanStack Query 与用量追踪",
         changes: [
@@ -291,7 +310,7 @@ export const zh: LandingDict = {
         ],
       },
       {
-        version: "0.1.8",
+        version: "0.1.18",
         date: "2026-04-07",
         title: "OAuth、OpenClaw 与 Issue 加载优化",
         changes: [
@@ -306,7 +325,7 @@ export const zh: LandingDict = {
         ],
       },
       {
-        version: "0.1.7",
+        version: "0.1.17",
         date: "2026-04-05",
         title: "评论分页与 CLI 优化",
         changes: [
@@ -320,7 +339,7 @@ export const zh: LandingDict = {
         ],
       },
       {
-        version: "0.1.6",
+        version: "0.1.15",
         date: "2026-04-03",
         title: "编辑器重构与 Agent 生命周期",
         changes: [
@@ -336,7 +355,7 @@ export const zh: LandingDict = {
         ],
       },
       {
-        version: "0.1.5",
+        version: "0.1.14",
         date: "2026-04-02",
         title: "提及与权限",
         changes: [
@@ -353,7 +372,7 @@ export const zh: LandingDict = {
         ],
       },
       {
-        version: "0.1.4",
+        version: "0.1.13",
         date: "2026-04-01",
         title: "\u6211\u7684 Issue \u4e0e\u56fd\u9645\u5316",
         changes: [

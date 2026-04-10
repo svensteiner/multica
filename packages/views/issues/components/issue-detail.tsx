@@ -12,6 +12,8 @@ import {
   Link2,
   MoreHorizontal,
   PanelRight,
+  Pin,
+  PinOff,
   Plus,
   Trash2,
   UserMinus,
@@ -41,9 +43,8 @@ import {
   DropdownMenuSubContent,
 } from "@multica/ui/components/ui/dropdown-menu";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@multica/ui/components/ui/resizable";
-import { ContentEditor, type ContentEditorRef } from "../../editor";
+import { ContentEditor, type ContentEditorRef, TitleEditor, useFileDropZone, FileDropOverlay } from "../../editor";
 import { FileUploadButton } from "@multica/ui/components/common/file-upload-button";
-import { TitleEditor } from "../../editor";
 import {
   Tooltip,
   TooltipTrigger,
@@ -69,6 +70,7 @@ import { useWorkspaceId } from "@multica/core/hooks";
 import { issueListOptions, issueDetailOptions, childIssuesOptions, issueUsageOptions } from "@multica/core/issues/queries";
 import { memberListOptions, agentListOptions } from "@multica/core/workspace/queries";
 import { useUpdateIssue, useDeleteIssue } from "@multica/core/issues/mutations";
+import { useRecentIssuesStore } from "@multica/core/issues/stores";
 import { useIssueTimeline } from "../hooks/use-issue-timeline";
 import { useIssueReactions } from "../hooks/use-issue-reactions";
 import { useIssueSubscribers } from "../hooks/use-issue-subscribers";
@@ -78,6 +80,8 @@ import { api } from "@multica/core/api";
 import { useModalStore } from "@multica/core/modals";
 import { timeAgo } from "@multica/core/utils";
 import { cn } from "@multica/ui/lib/utils";
+import { pinListOptions } from "@multica/core/pins";
+import { useCreatePin, useDeletePin } from "@multica/core/pins";
 
 import { ProgressRing } from "./progress-ring";
 
@@ -228,6 +232,19 @@ export function IssueDetail({ issueId, onDelete, defaultSidebarOpen = true, layo
     },
   });
 
+  // Record recent visit
+  const recordVisit = useRecentIssuesStore((s) => s.recordVisit);
+  useEffect(() => {
+    if (issue) {
+      recordVisit({
+        id: issue.id,
+        identifier: issue.identifier,
+        title: issue.title,
+        status: issue.status,
+      });
+    }
+  }, [issue?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Custom hooks — encapsulate timeline, reactions, subscribers
   const {
     timeline, loading: timelineLoading, submitComment, submitReply,
@@ -245,6 +262,12 @@ export function IssueDetail({ issueId, onDelete, defaultSidebarOpen = true, layo
 
   // Token usage
   const { data: usage } = useQuery(issueUsageOptions(id));
+
+  // Pinned state
+  const { data: pinnedItems = [] } = useQuery(pinListOptions(wsId));
+  const isPinned = pinnedItems.some((p) => p.item_type === "issue" && p.item_id === id);
+  const createPin = useCreatePin();
+  const deletePin = useDeletePin();
 
   // Sub-issue queries
   const parentIssueId = issue?.parent_issue_id;
@@ -297,6 +320,9 @@ export function IssueDetail({ issueId, onDelete, defaultSidebarOpen = true, layo
   );
 
   const descEditorRef = useRef<ContentEditorRef>(null);
+  const { isDragOver: descDragOver, dropZoneProps: descDropZoneProps } = useFileDropZone({
+    onDrop: (files) => files.forEach((f) => descEditorRef.current?.uploadFile(f)),
+  });
   // Description uploads don't pass issueId — the URL lives in the markdown.
   // This avoids stale attachment records when users delete images from the editor.
   const handleDescriptionUpload = useCallback(
@@ -460,6 +486,27 @@ export function IssueDetail({ issueId, onDelete, defaultSidebarOpen = true, layo
                 </Tooltip>
               </div>
             )}
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    className={cn("text-muted-foreground", isPinned && "text-foreground")}
+                    onClick={() => {
+                      if (isPinned) {
+                        deletePin.mutate({ itemType: "issue", itemId: issue.id });
+                      } else {
+                        createPin.mutate({ item_type: "issue", item_id: issue.id });
+                      }
+                    }}
+                  >
+                    {isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
+                  </Button>
+                }
+              />
+              <TooltipContent side="bottom">{isPinned ? "Unpin from sidebar" : "Pin to sidebar"}</TooltipContent>
+            </Tooltip>
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
@@ -594,6 +641,18 @@ export function IssueDetail({ issueId, onDelete, defaultSidebarOpen = true, layo
                   Create sub-issue
                 </DropdownMenuItem>
 
+                {/* Pin / Unpin */}
+                <DropdownMenuItem onClick={() => {
+                  if (isPinned) {
+                    deletePin.mutate({ itemType: "issue", itemId: issue.id });
+                  } else {
+                    createPin.mutate({ item_type: "issue", item_id: issue.id });
+                  }
+                }}>
+                  {isPinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
+                  {isPinned ? "Unpin from sidebar" : "Pin to sidebar"}
+                </DropdownMenuItem>
+
                 {/* Copy link */}
                 <DropdownMenuItem onClick={() => {
                   const url = router.getShareableUrl
@@ -702,35 +761,37 @@ export function IssueDetail({ issueId, onDelete, defaultSidebarOpen = true, layo
             </AppLink>
           )}
 
-          <ContentEditor
-            ref={descEditorRef}
-            key={id}
-            defaultValue={issue.description || ""}
-            placeholder="Add description..."
-            onUpdate={(md) => handleUpdateField({ description: md || undefined })}
-            onUploadFile={handleDescriptionUpload}
-            debounceMs={1500}
-            className="mt-5"
-          />
-
-          <div className="flex items-center gap-1 mt-3">
-            {reactionsLoading ? (
-              <div className="flex items-center gap-1">
-                <Skeleton className="h-7 w-14 rounded-full" />
-                <Skeleton className="h-7 w-14 rounded-full" />
-              </div>
-            ) : (
-              <ReactionBar
-                reactions={issueReactions}
-                currentUserId={user?.id}
-                onToggle={handleToggleIssueReaction}
-                getActorName={getActorName}
-              />
-            )}
-            <FileUploadButton
-              size="sm"
-              onSelect={(file) => descEditorRef.current?.uploadFile(file)}
+          <div {...descDropZoneProps} className="relative mt-5 rounded-lg">
+            <ContentEditor
+              ref={descEditorRef}
+              key={id}
+              defaultValue={issue.description || ""}
+              placeholder="Add description..."
+              onUpdate={(md) => handleUpdateField({ description: md || undefined })}
+              onUploadFile={handleDescriptionUpload}
+              debounceMs={1500}
             />
+
+            <div className="flex items-center gap-1 mt-3">
+              {reactionsLoading ? (
+                <div className="flex items-center gap-1">
+                  <Skeleton className="h-7 w-14 rounded-full" />
+                  <Skeleton className="h-7 w-14 rounded-full" />
+                </div>
+              ) : (
+                <ReactionBar
+                  reactions={issueReactions}
+                  currentUserId={user?.id}
+                  onToggle={handleToggleIssueReaction}
+                  getActorName={getActorName}
+                />
+              )}
+              <FileUploadButton
+                size="sm"
+                onSelect={(file) => descEditorRef.current?.uploadFile(file)}
+              />
+            </div>
+            {descDragOver && <FileDropOverlay />}
           </div>
 
           {/* Sub-issues — Linear-style */}

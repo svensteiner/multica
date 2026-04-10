@@ -163,6 +163,9 @@ func NewRouter(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus) chi.Route
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.RequireWorkspaceMember(queries))
 
+			// Assignee frequency
+			r.Get("/api/assignee-frequency", h.GetAssigneeFrequency)
+
 			// Issues
 			r.Route("/api/issues", func(r chi.Router) {
 				r.Get("/search", h.SearchIssues)
@@ -193,6 +196,7 @@ func NewRouter(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus) chi.Route
 
 			// Projects
 			r.Route("/api/projects", func(r chi.Router) {
+				r.Get("/search", h.SearchProjects)
 				r.Get("/", h.ListProjects)
 				r.Post("/", h.CreateProject)
 				r.Route("/{id}", func(r chi.Router) {
@@ -200,6 +204,14 @@ func NewRouter(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus) chi.Route
 					r.Put("/", h.UpdateProject)
 					r.Delete("/", h.DeleteProject)
 				})
+			})
+
+			// Pins
+			r.Route("/api/pins", func(r chi.Router) {
+				r.Get("/", h.ListPins)
+				r.Post("/", h.CreatePin)
+				r.Put("/reorder", h.ReorderPins)
+				r.Delete("/{itemType}/{itemId}", h.DeletePin)
 			})
 
 			// Attachments

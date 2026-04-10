@@ -70,6 +70,10 @@ vi.mock("@multica/core/workspace/queries", () => ({
     queryKey: ["workspaces", "ws-1", "agents"],
     queryFn: () => Promise.resolve([]),
   }),
+  assigneeFrequencyOptions: () => ({
+    queryKey: ["workspaces", "ws-1", "assignee-frequency"],
+    queryFn: () => Promise.resolve([]),
+  }),
 }));
 
 // Mock navigation
@@ -85,6 +89,8 @@ vi.mock("../../navigation", () => ({
 
 // Mock editor components (Tiptap requires real DOM)
 vi.mock("../../editor", () => ({
+  useFileDropZone: () => ({ isDragOver: false, dropZoneProps: {} }),
+  FileDropOverlay: () => null,
   ReadonlyContent: ({ content }: { content: string }) => (
     <div data-testid="readonly-content">{content}</div>
   ),
@@ -202,6 +208,18 @@ vi.mock("@multica/core/issues/config", () => ({
     low: { label: "Low", bars: 1, color: "text-info", badgeBg: "bg-info/10", badgeText: "text-info" },
     none: { label: "No priority", bars: 0, color: "text-muted-foreground", badgeBg: "bg-muted", badgeText: "text-muted-foreground" },
   },
+}));
+
+// Mock recent issues store
+const mockRecordVisit = vi.fn();
+vi.mock("@multica/core/issues/stores", () => ({
+  useRecentIssuesStore: Object.assign(
+    (selector?: any) => {
+      const state = { items: [], recordVisit: mockRecordVisit };
+      return selector ? selector(state) : state;
+    },
+    { getState: () => ({ items: [], recordVisit: mockRecordVisit }) },
+  ),
 }));
 
 // Mock modals

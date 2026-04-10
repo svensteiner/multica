@@ -4,6 +4,7 @@ import type {
   UpdateIssueRequest,
   ListIssuesResponse,
   SearchIssuesResponse,
+  SearchProjectsResponse,
   UpdateMeRequest,
   CreateMemberRequest,
   UpdateMemberRequest,
@@ -35,6 +36,7 @@ import type {
   RuntimePing,
   RuntimeUpdate,
   TimelineEntry,
+  AssigneeFrequencyEntry,
   TaskMessagePayload,
   Attachment,
   ChatSession,
@@ -44,6 +46,10 @@ import type {
   CreateProjectRequest,
   UpdateProjectRequest,
   ListProjectsResponse,
+  PinnedItem,
+  CreatePinRequest,
+  PinnedItemType,
+  ReorderPinsRequest,
 } from "../types";
 import { type Logger, noopLogger } from "../logger";
 
@@ -182,6 +188,8 @@ export class ApiClient {
     if (params?.status) search.set("status", params.status);
     if (params?.priority) search.set("priority", params.priority);
     if (params?.assignee_id) search.set("assignee_id", params.assignee_id);
+    if (params?.assignee_ids?.length) search.set("assignee_ids", params.assignee_ids.join(","));
+    if (params?.creator_id) search.set("creator_id", params.creator_id);
     if (params?.open_only) search.set("open_only", "true");
     return this.fetch(`/api/issues?${search}`);
   }
@@ -192,6 +200,14 @@ export class ApiClient {
     if (params.offset !== undefined) search.set("offset", String(params.offset));
     if (params.include_closed) search.set("include_closed", "true");
     return this.fetch(`/api/issues/search?${search}`, params.signal ? { signal: params.signal } : undefined);
+  }
+
+  async searchProjects(params: { q: string; limit?: number; offset?: number; include_closed?: boolean; signal?: AbortSignal }): Promise<SearchProjectsResponse> {
+    const search = new URLSearchParams({ q: params.q });
+    if (params.limit !== undefined) search.set("limit", String(params.limit));
+    if (params.offset !== undefined) search.set("offset", String(params.offset));
+    if (params.include_closed) search.set("include_closed", "true");
+    return this.fetch(`/api/projects/search?${search}`, params.signal ? { signal: params.signal } : undefined);
   }
 
   async getIssue(id: string): Promise<Issue> {
@@ -255,6 +271,10 @@ export class ApiClient {
 
   async listTimeline(issueId: string): Promise<TimelineEntry[]> {
     return this.fetch(`/api/issues/${issueId}/timeline`);
+  }
+
+  async getAssigneeFrequency(): Promise<AssigneeFrequencyEntry[]> {
+    return this.fetch("/api/assignee-frequency");
   }
 
   async updateComment(commentId: string, content: string): Promise<Comment> {
@@ -685,5 +705,28 @@ export class ApiClient {
 
   async deleteProject(id: string): Promise<void> {
     await this.fetch(`/api/projects/${id}`, { method: "DELETE" });
+  }
+
+  // Pins
+  async listPins(): Promise<PinnedItem[]> {
+    return this.fetch("/api/pins");
+  }
+
+  async createPin(data: CreatePinRequest): Promise<PinnedItem> {
+    return this.fetch("/api/pins", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deletePin(itemType: PinnedItemType, itemId: string): Promise<void> {
+    await this.fetch(`/api/pins/${itemType}/${itemId}`, { method: "DELETE" });
+  }
+
+  async reorderPins(data: ReorderPinsRequest): Promise<void> {
+    await this.fetch("/api/pins/reorder", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
   }
 }

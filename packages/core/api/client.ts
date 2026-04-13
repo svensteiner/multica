@@ -64,6 +64,18 @@ export interface LoginResponse {
   user: User;
 }
 
+export class ApiError extends Error {
+  readonly status: number;
+  readonly statusText: string;
+
+  constructor(message: string, status: number, statusText: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.statusText = statusText;
+  }
+}
+
 export class ApiClient {
   private baseUrl: string;
   private token: string | null = null;
@@ -75,6 +87,10 @@ export class ApiClient {
     this.baseUrl = baseUrl;
     this.options = options ?? {};
     this.logger = options?.logger ?? noopLogger;
+  }
+
+  getBaseUrl(): string {
+    return this.baseUrl;
   }
 
   setToken(token: string | null) {
@@ -143,7 +159,7 @@ export class ApiClient {
       const message = await this.parseErrorMessage(res, `API error: ${res.status} ${res.statusText}`);
       const logLevel = res.status === 404 ? "warn" : "error";
       this.logger[logLevel](`← ${res.status} ${path}`, { rid, duration: `${Date.now() - start}ms`, error: message });
-      throw new Error(message);
+      throw new ApiError(message, res.status, res.statusText);
     }
 
     this.logger.info(`← ${res.status} ${path}`, { rid, duration: `${Date.now() - start}ms` });
@@ -180,6 +196,10 @@ export class ApiClient {
 
   async logout(): Promise<void> {
     await this.fetch("/auth/logout", { method: "POST" });
+  }
+
+  async issueCliToken(): Promise<{ token: string }> {
+    return this.fetch("/api/cli-token", { method: "POST" });
   }
 
   async getMe(): Promise<User> {

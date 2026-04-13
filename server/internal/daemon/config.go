@@ -33,7 +33,7 @@ type Config struct {
 	RuntimeName        string
 	CLIVersion         string                // multica CLI version (e.g. "0.1.13")
 	Profile            string                // profile name (empty = default)
-	Agents             map[string]AgentEntry // "claude" -> entry, "codex" -> entry, "opencode" -> entry, "openclaw" -> entry, "hermes" -> entry
+	Agents             map[string]AgentEntry // keyed by provider: claude, codex, opencode, openclaw, hermes, gemini
 	WorkspacesRoot     string                // base path for execution envs (default: ~/multica_workspaces)
 	KeepEnvAfterTask   bool                  // preserve env after task for debugging
 	HealthPort         int                   // local HTTP port for health checks (default: 19514)
@@ -113,8 +113,15 @@ func LoadConfig(overrides Overrides) (Config, error) {
 			Model: strings.TrimSpace(os.Getenv("MULTICA_HERMES_MODEL")),
 		}
 	}
+	geminiPath := envOrDefault("MULTICA_GEMINI_PATH", "gemini")
+	if _, err := exec.LookPath(geminiPath); err == nil {
+		agents["gemini"] = AgentEntry{
+			Path:  geminiPath,
+			Model: strings.TrimSpace(os.Getenv("MULTICA_GEMINI_MODEL")),
+		}
+	}
 	if len(agents) == 0 {
-		return Config{}, fmt.Errorf("no agent CLI found: install claude, codex, opencode, openclaw, or hermes and ensure it is on PATH")
+		return Config{}, fmt.Errorf("no agent CLI found: install claude, codex, opencode, openclaw, hermes, or gemini and ensure it is on PATH")
 	}
 
 	// Host info
@@ -164,11 +171,10 @@ func LoadConfig(overrides Overrides) (Config, error) {
 	if overrides.DaemonID != "" {
 		daemonID = overrides.DaemonID
 	}
-	// Suffix daemon ID with profile name to avoid collisions when multiple
-	// daemons register against the same server.
-	if profile != "" && !strings.HasSuffix(daemonID, "-"+profile) {
-		daemonID = daemonID + "-" + profile
-	}
+	// NOTE: daemon_id is intentionally stable (hostname or explicit override).
+	// The unique constraint (workspace_id, daemon_id, provider) already prevents
+	// collisions within the same workspace. Appending the profile name caused
+	// duplicate runtimes when users switched profiles.
 
 	deviceName := envOrDefault("MULTICA_DAEMON_DEVICE_NAME", host)
 	if overrides.DeviceName != "" {

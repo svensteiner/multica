@@ -302,6 +302,156 @@ func TestCreateIssueExplicitBacklogPreserved(t *testing.T) {
 	testHandler.DeleteIssue(httptest.NewRecorder(), cleanupReq)
 }
 
+func TestCreateSubIssueInheritsParentProject(t *testing.T) {
+	var projectID, parentID, childID string
+	defer func() {
+		for _, issueID := range []string{childID, parentID} {
+			if issueID == "" {
+				continue
+			}
+			req := newRequest("DELETE", "/api/issues/"+issueID, nil)
+			req = withURLParam(req, "id", issueID)
+			testHandler.DeleteIssue(httptest.NewRecorder(), req)
+		}
+		if projectID != "" {
+			req := newRequest("DELETE", "/api/projects/"+projectID, nil)
+			req = withURLParam(req, "id", projectID)
+			testHandler.DeleteProject(httptest.NewRecorder(), req)
+		}
+	}()
+
+	w := httptest.NewRecorder()
+	req := newRequest("POST", "/api/projects?workspace_id="+testWorkspaceID, map[string]any{
+		"title": "Sub-issue inheritance project",
+	})
+	testHandler.CreateProject(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("CreateProject: expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	var project ProjectResponse
+	json.NewDecoder(w.Body).Decode(&project)
+	projectID = project.ID
+
+	w = httptest.NewRecorder()
+	req = newRequest("POST", "/api/issues?workspace_id="+testWorkspaceID, map[string]any{
+		"title":      "Parent with project",
+		"project_id": projectID,
+	})
+	testHandler.CreateIssue(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("CreateIssue parent: expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	var parent IssueResponse
+	json.NewDecoder(w.Body).Decode(&parent)
+	parentID = parent.ID
+	if parent.ProjectID == nil || *parent.ProjectID != projectID {
+		t.Fatalf("CreateIssue parent: expected project_id %q, got %v", projectID, parent.ProjectID)
+	}
+
+	w = httptest.NewRecorder()
+	req = newRequest("POST", "/api/issues?workspace_id="+testWorkspaceID, map[string]any{
+		"title":           "Child without explicit project",
+		"parent_issue_id": parentID,
+	})
+	testHandler.CreateIssue(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("CreateIssue child: expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	var child IssueResponse
+	json.NewDecoder(w.Body).Decode(&child)
+	childID = child.ID
+
+	if child.ParentIssueID == nil || *child.ParentIssueID != parentID {
+		t.Fatalf("CreateIssue child: expected parent_issue_id %q, got %v", parentID, child.ParentIssueID)
+	}
+	if child.ProjectID == nil || *child.ProjectID != projectID {
+		t.Fatalf("CreateIssue child: expected inherited project_id %q, got %v", projectID, child.ProjectID)
+	}
+}
+
+func TestCreateSubIssueUsesExplicitProjectOverParentProject(t *testing.T) {
+	var parentProjectID, childProjectID, parentID, childID string
+	defer func() {
+		for _, issueID := range []string{childID, parentID} {
+			if issueID == "" {
+				continue
+			}
+			req := newRequest("DELETE", "/api/issues/"+issueID, nil)
+			req = withURLParam(req, "id", issueID)
+			testHandler.DeleteIssue(httptest.NewRecorder(), req)
+		}
+		for _, projectID := range []string{childProjectID, parentProjectID} {
+			if projectID == "" {
+				continue
+			}
+			req := newRequest("DELETE", "/api/projects/"+projectID, nil)
+			req = withURLParam(req, "id", projectID)
+			testHandler.DeleteProject(httptest.NewRecorder(), req)
+		}
+	}()
+
+	w := httptest.NewRecorder()
+	req := newRequest("POST", "/api/projects?workspace_id="+testWorkspaceID, map[string]any{
+		"title": "Parent project",
+	})
+	testHandler.CreateProject(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("CreateProject parent: expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	var parentProject ProjectResponse
+	json.NewDecoder(w.Body).Decode(&parentProject)
+	parentProjectID = parentProject.ID
+
+	w = httptest.NewRecorder()
+	req = newRequest("POST", "/api/projects?workspace_id="+testWorkspaceID, map[string]any{
+		"title": "Child explicit project",
+	})
+	testHandler.CreateProject(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("CreateProject child: expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	var childProject ProjectResponse
+	json.NewDecoder(w.Body).Decode(&childProject)
+	childProjectID = childProject.ID
+
+	w = httptest.NewRecorder()
+	req = newRequest("POST", "/api/issues?workspace_id="+testWorkspaceID, map[string]any{
+		"title":      "Parent with project",
+		"project_id": parentProjectID,
+	})
+	testHandler.CreateIssue(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("CreateIssue parent: expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	var parent IssueResponse
+	json.NewDecoder(w.Body).Decode(&parent)
+	parentID = parent.ID
+	if parent.ProjectID == nil || *parent.ProjectID != parentProjectID {
+		t.Fatalf("CreateIssue parent: expected project_id %q, got %v", parentProjectID, parent.ProjectID)
+	}
+
+	w = httptest.NewRecorder()
+	req = newRequest("POST", "/api/issues?workspace_id="+testWorkspaceID, map[string]any{
+		"title":           "Child with explicit project",
+		"parent_issue_id": parentID,
+		"project_id":      childProjectID,
+	})
+	testHandler.CreateIssue(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("CreateIssue child: expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	var child IssueResponse
+	json.NewDecoder(w.Body).Decode(&child)
+	childID = child.ID
+
+	if child.ParentIssueID == nil || *child.ParentIssueID != parentID {
+		t.Fatalf("CreateIssue child: expected parent_issue_id %q, got %v", parentID, child.ParentIssueID)
+	}
+	if child.ProjectID == nil || *child.ProjectID != childProjectID {
+		t.Fatalf("CreateIssue child: expected explicit project_id %q, got %v", childProjectID, child.ProjectID)
+	}
+}
+
 func TestCommentCRUD(t *testing.T) {
 	// Create an issue first
 	w := httptest.NewRecorder()
@@ -409,6 +559,72 @@ func TestWorkspaceCRUD(t *testing.T) {
 	testHandler.GetWorkspace(w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("GetWorkspace: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestCreateWorkspaceUsesRequestedSlug(t *testing.T) {
+	const slug = "handler-create-workspace-requested"
+	ctx := context.Background()
+
+	t.Cleanup(func() {
+		testPool.Exec(ctx, `DELETE FROM workspace WHERE slug = $1`, slug)
+	})
+
+	w := httptest.NewRecorder()
+	req := newRequest("POST", "/api/workspaces", map[string]string{
+		"name": "Handler Create Workspace Requested",
+		"slug": slug,
+	})
+	testHandler.CreateWorkspace(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("CreateWorkspace: expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var created WorkspaceResponse
+	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
+		t.Fatalf("CreateWorkspace: decode response: %v", err)
+	}
+	if created.Slug != slug {
+		t.Fatalf("CreateWorkspace: expected slug %q, got %q", slug, created.Slug)
+	}
+}
+
+func TestCreateWorkspaceSlugConflictReturnsConflict(t *testing.T) {
+	ctx := context.Background()
+	retriedSlug := handlerTestWorkspaceSlug + "-2"
+
+	t.Cleanup(func() {
+		testPool.Exec(ctx, `DELETE FROM workspace WHERE slug = $1`, retriedSlug)
+	})
+
+	w := httptest.NewRecorder()
+	req := newRequest("POST", "/api/workspaces", map[string]string{
+		"name": "Duplicate Handler Workspace",
+		"slug": handlerTestWorkspaceSlug,
+	})
+	testHandler.CreateWorkspace(w, req)
+	if w.Code != http.StatusConflict {
+		t.Fatalf("CreateWorkspace: expected 409, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var count int
+	if err := testPool.QueryRow(ctx, `SELECT count(*) FROM workspace WHERE slug = $1`, retriedSlug).Scan(&count); err != nil {
+		t.Fatalf("CreateWorkspace: check retried slug: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("CreateWorkspace: expected no fallback slug %q, got %d rows", retriedSlug, count)
+	}
+}
+
+func TestCreateWorkspaceInvalidSlugReturnsBadRequest(t *testing.T) {
+	w := httptest.NewRecorder()
+	req := newRequest("POST", "/api/workspaces", map[string]string{
+		"name": "Invalid Slug Workspace",
+		"slug": "invalid slug",
+	})
+	testHandler.CreateWorkspace(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("CreateWorkspace: expected 400, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -695,11 +911,11 @@ func TestResolveActor(t *testing.T) {
 	})
 
 	tests := []struct {
-		name            string
-		agentIDHeader   string
-		taskIDHeader    string
-		wantActorType   string
-		wantIsAgent     bool
+		name          string
+		agentIDHeader string
+		taskIDHeader  string
+		wantActorType string
+		wantIsAgent   bool
 	}{
 		{
 			name:          "no headers returns member",

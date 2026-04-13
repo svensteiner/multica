@@ -110,9 +110,9 @@ func (h *Handler) SendCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Rate limit: max 1 code per 10 seconds per email
+	// Rate limit: max 1 code per 60 seconds per email
 	latest, err := h.Queries.GetLatestCodeByEmail(r.Context(), email)
-	if err == nil && time.Since(latest.CreatedAt.Time) < 10*time.Second {
+	if err == nil && time.Since(latest.CreatedAt.Time) < 60*time.Second {
 		writeError(w, http.StatusTooManyRequests, "please wait before requesting another code")
 		return
 	}
@@ -388,6 +388,31 @@ func (h *Handler) GoogleLogin(w http.ResponseWriter, r *http.Request) {
 		Token: tokenString,
 		User:  userToResponse(user),
 	})
+}
+
+// IssueCliToken returns a fresh JWT for the authenticated user.
+// This allows cookie-authenticated browser sessions to obtain a bearer token
+// that can be handed off to the CLI via the cli_callback redirect.
+func (h *Handler) IssueCliToken(w http.ResponseWriter, r *http.Request) {
+	userID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+
+	user, err := h.Queries.GetUser(r.Context(), parseUUID(userID))
+	if err != nil {
+		writeError(w, http.StatusNotFound, "user not found")
+		return
+	}
+
+	tokenString, err := h.issueJWT(user)
+	if err != nil {
+		slog.Warn("cli-token: failed to issue JWT", append(logger.RequestAttrs(r), "error", err, "user_id", userID)...)
+		writeError(w, http.StatusInternalServerError, "failed to generate token")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"token": tokenString})
 }
 
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {

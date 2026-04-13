@@ -128,18 +128,6 @@ function Add-ToUserPath {
     Write-Info "Added $Dir to user PATH (restart your terminal for other sessions to pick it up)."
 }
 
-function Install-CliScoop {
-    Write-Info "Installing Multica CLI via Scoop..."
-    try {
-        scoop bucket add multica https://github.com/multica-ai/scoop-bucket.git 2>$null
-        scoop install multica
-        Write-Ok "Multica CLI installed via Scoop"
-    } catch {
-        Write-Warn "Scoop install failed, falling back to direct download."
-        Install-CliBinary
-    }
-}
-
 function Install-Cli {
     if (Test-CommandExists "multica") {
         $currentVer = (multica version 2>$null) -replace '.*?(v[\d.]+).*','$1'
@@ -170,11 +158,7 @@ function Install-Cli {
         return
     }
 
-    if (Test-CommandExists "scoop") {
-        Install-CliScoop
-    } else {
-        Install-CliBinary
-    }
+    Install-CliBinary
 
     if (-not (Test-CommandExists "multica")) {
         Write-Fail "CLI installed but 'multica' not found on PATH. Restart your terminal and try again."
@@ -273,26 +257,6 @@ function Install-Server {
     Pop-Location
 }
 
-# ---------------------------------------------------------------------------
-# Configure CLI
-# ---------------------------------------------------------------------------
-function Set-ConfigLocal {
-    Write-Info "Configuring CLI for local server..."
-    try {
-        multica config local 2>$null
-    } catch {
-        multica config set app_url http://localhost:3000 2>$null
-        multica config set server_url http://localhost:8080 2>$null
-    }
-    Write-Ok "CLI configured for localhost (backend :8080, frontend :3000)"
-}
-
-function Set-ConfigCloud {
-    Write-Info "Configuring CLI for Multica Cloud..."
-    multica config set server_url https://api.multica.ai 2>$null
-    multica config set app_url https://multica.ai 2>$null
-    Write-Ok "CLI configured for multica.ai"
-}
 
 # ---------------------------------------------------------------------------
 # Main: Default mode (cloud)
@@ -300,28 +264,22 @@ function Set-ConfigCloud {
 function Start-DefaultInstall {
     Write-Host ""
     Write-Host "  Multica - Installer" -ForegroundColor White
-    Write-Host "  Installing the CLI to connect to multica.ai" -ForegroundColor Cyan
     Write-Host ""
 
     Install-Cli
-    Set-ConfigCloud
 
     Write-Host ""
     Write-Host "  ============================================" -ForegroundColor Green
-    Write-Host "  [OK] Multica CLI is installed!" -ForegroundColor Green
+    Write-Host "  [OK] Multica CLI is ready!" -ForegroundColor Green
     Write-Host "  ============================================" -ForegroundColor Green
     Write-Host ""
-    Write-Host "  Next steps:"
+    Write-Host "  Next: configure your environment"
     Write-Host ""
-    Write-Host "     multica login          " -NoNewline; Write-Host "# Authenticate with multica.ai" -ForegroundColor DarkGray
-    Write-Host "     multica daemon start   " -NoNewline; Write-Host "# Start the agent daemon" -ForegroundColor DarkGray
+    Write-Host "     multica setup               " -NoNewline; Write-Host "# Connect to Multica Cloud (multica.ai)" -ForegroundColor DarkGray
+    Write-Host "     multica setup self-host      " -NoNewline; Write-Host "# Connect to a self-hosted server" -ForegroundColor DarkGray
     Write-Host ""
-    Write-Host "  Or do it all in one command:"
-    Write-Host ""
-    Write-Host "     multica setup" -ForegroundColor Cyan
-    Write-Host ""
-    Write-Host "  Self-hosting? Re-run with:"
-    Write-Host '     $env:MULTICA_MODE="local"; irm https://raw.githubusercontent.com/multica-ai/multica/main/scripts/install.ps1 | iex'
+    Write-Host "  Self-hosting? Install the server first:"
+    Write-Host '     $env:MULTICA_MODE="with-server"; irm https://raw.githubusercontent.com/multica-ai/multica/main/scripts/install.ps1 | iex'
     Write-Host ""
 }
 
@@ -331,30 +289,27 @@ function Start-DefaultInstall {
 function Start-LocalInstall {
     Write-Host ""
     Write-Host "  Multica - Self-Host Installer" -ForegroundColor White
-    Write-Host "  Setting up a local Multica server + CLI"
+    Write-Host "  Provisioning server infrastructure + installing CLI"
     Write-Host ""
 
     Test-Docker
     Install-Server
     Install-Cli
-    Set-ConfigLocal
 
     Write-Host ""
     Write-Host "  ============================================" -ForegroundColor Green
-    Write-Host "  [OK] Multica is installed and running!" -ForegroundColor Green
+    Write-Host "  [OK] Multica server is running and CLI is ready!" -ForegroundColor Green
     Write-Host "  ============================================" -ForegroundColor Green
     Write-Host ""
     Write-Host "  Frontend:  http://localhost:3000"
     Write-Host "  Backend:   http://localhost:8080"
     Write-Host "  Server at: $InstallDir"
     Write-Host ""
-    Write-Host "  Next steps:"
-    Write-Host "  1. Open http://localhost:3000 in your browser"
-    Write-Host "  2. Log in with any email + verification code: 888888"
-    Write-Host "  3. Then run:"
+    Write-Host "  Next: configure your CLI to connect"
     Write-Host ""
-    Write-Host "     multica login          " -NoNewline; Write-Host "# Authenticate (opens browser)" -ForegroundColor DarkGray
-    Write-Host "     multica daemon start   " -NoNewline; Write-Host "# Start the agent daemon" -ForegroundColor DarkGray
+    Write-Host "     multica setup self-host  " -NoNewline; Write-Host "# Configure + authenticate + start daemon" -ForegroundColor DarkGray
+    Write-Host ""
+    Write-Host "  Default verification code: 888888"
     Write-Host ""
     Write-Host "  To stop all services:"
     Write-Host '     $env:MULTICA_MODE="stop"; irm https://raw.githubusercontent.com/multica-ai/multica/main/scripts/install.ps1 | iex'
@@ -397,7 +352,8 @@ function Start-Stop {
 $mode = if ($env:MULTICA_MODE) { $env:MULTICA_MODE.ToLower() } else { "default" }
 
 switch ($mode) {
-    "local" { Start-LocalInstall }
-    "stop"  { Start-Stop }
-    default { Start-DefaultInstall }
+    "with-server" { Start-LocalInstall }
+    "local"       { Start-LocalInstall }  # backwards compat alias
+    "stop"        { Start-Stop }
+    default       { Start-DefaultInstall }
 }

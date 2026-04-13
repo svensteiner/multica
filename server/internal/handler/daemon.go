@@ -382,6 +382,15 @@ func (h *Handler) ClaimTaskByRuntime(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		// Fetch the triggering comment content so the daemon can embed it
+		// directly in the agent prompt (prevents the agent from ignoring comments
+		// when stale output files exist in a reused workdir).
+		if task.TriggerCommentID.Valid {
+			if comment, err := h.Queries.GetComment(r.Context(), task.TriggerCommentID); err == nil {
+				resp.TriggerCommentContent = comment.Content
+			}
+		}
+
 		// Look up the prior session for this (agent, issue) pair so the daemon
 		// can resume the Claude Code conversation context.
 		if prior, err := h.Queries.GetLastTaskSession(r.Context(), db.GetLastTaskSessionParams{
@@ -840,5 +849,19 @@ func (h *Handler) GetIssueUsage(w http.ResponseWriter, r *http.Request) {
 		"total_cache_read_tokens":  row.TotalCacheReadTokens,
 		"total_cache_write_tokens": row.TotalCacheWriteTokens,
 		"task_count":               row.TaskCount,
+	})
+}
+
+// GetIssueGCCheck returns minimal issue info needed by the daemon GC loop.
+func (h *Handler) GetIssueGCCheck(w http.ResponseWriter, r *http.Request) {
+	issueID := chi.URLParam(r, "issueId")
+	issue, err := h.Queries.GetIssue(r.Context(), parseUUID(issueID))
+	if err != nil {
+		writeError(w, http.StatusNotFound, "issue not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":     issue.Status,
+		"updated_at": issue.UpdatedAt.Time,
 	})
 }

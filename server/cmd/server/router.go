@@ -78,10 +78,16 @@ func NewRouter(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus) chi.Route
 	r.Use(chimw.RequestID)
 	r.Use(middleware.RequestLogger)
 	r.Use(chimw.Recoverer)
+	r.Use(middleware.ContentSecurityPolicy)
+	origins := allowedOrigins()
+
+	// Share allowed origins with WebSocket origin checker.
+	realtime.SetAllowedOrigins(origins)
+
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   allowedOrigins(),
+		AllowedOrigins:   origins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Workspace-ID", "X-Request-ID", "X-Agent-ID", "X-Task-ID"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Workspace-ID", "X-Request-ID", "X-Agent-ID", "X-Task-ID", "X-CSRF-Token"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
@@ -111,6 +117,7 @@ func NewRouter(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus) chi.Route
 	r.Post("/auth/send-code", h.SendCode)
 	r.Post("/auth/verify-code", h.VerifyCode)
 	r.Post("/auth/google", h.GoogleLogin)
+	r.Post("/auth/logout", h.Logout)
 
 	// Daemon API routes (require daemon token or valid user token)
 	r.Route("/api/daemon", func(r chi.Router) {
@@ -134,6 +141,8 @@ func NewRouter(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus) chi.Route
 		r.Post("/tasks/{taskId}/usage", h.ReportTaskUsage)
 		r.Post("/tasks/{taskId}/messages", h.ReportTaskMessages)
 		r.Get("/tasks/{taskId}/messages", h.ListTaskMessages)
+
+		r.Get("/issues/{issueId}/gc-check", h.GetIssueGCCheck)
 	})
 
 	// Protected API routes

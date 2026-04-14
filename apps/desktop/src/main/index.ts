@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow, ipcMain } from "electron";
 import { join } from "path";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import { setupAutoUpdater } from "./updater";
+import { setupDaemonManager } from "./daemon-manager";
 
 const PROTOCOL = "multica";
 
@@ -113,9 +114,18 @@ if (!gotTheLock) {
       return shell.openExternal(url);
     });
 
+    // IPC: toggle immersive mode — hides the macOS traffic lights so full-screen
+    // modals (create-workspace, onboarding) can place UI in the top-left corner
+    // without fighting the native window controls' hit-test.
+    ipcMain.handle("window:setImmersive", (_event, immersive: boolean) => {
+      if (process.platform !== "darwin") return;
+      mainWindow?.setWindowButtonVisibility(!immersive);
+    });
+
     createWindow();
 
     setupAutoUpdater(() => mainWindow);
+    setupDaemonManager(() => mainWindow);
 
     // macOS: deep link arrives via open-url event
     app.on("open-url", (_event, url) => {

@@ -151,6 +151,7 @@ func NewRouter(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus) chi.Route
 		r.Use(middleware.RefreshCloudFrontCookies(cfSigner))
 
 		// --- User-scoped routes (no workspace context required) ---
+		r.Get("/api/config", h.GetConfig)
 		r.Get("/api/me", h.GetMe)
 		r.Patch("/api/me", h.UpdateMe)
 		r.Post("/api/cli-token", h.IssueCliToken)
@@ -245,6 +246,24 @@ func NewRouter(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus) chi.Route
 					r.Get("/", h.GetProject)
 					r.Put("/", h.UpdateProject)
 					r.Delete("/", h.DeleteProject)
+				})
+			})
+
+			// Autopilots
+			r.Route("/api/autopilots", func(r chi.Router) {
+				r.Get("/", h.ListAutopilots)
+				r.Post("/", h.CreateAutopilot)
+				r.Route("/{id}", func(r chi.Router) {
+					r.Get("/", h.GetAutopilot)
+					r.Patch("/", h.UpdateAutopilot)
+					r.Delete("/", h.DeleteAutopilot)
+					r.Post("/trigger", h.TriggerAutopilot)
+					r.Get("/runs", h.ListAutopilotRuns)
+					r.Post("/triggers", h.CreateAutopilotTrigger)
+					r.Route("/triggers/{triggerId}", func(r chi.Router) {
+						r.Patch("/", h.UpdateAutopilotTrigger)
+						r.Delete("/", h.DeleteAutopilotTrigger)
+					})
 				})
 			})
 

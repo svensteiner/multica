@@ -127,8 +127,22 @@ func LoadConfig(overrides Overrides) (Config, error) {
 			Model: strings.TrimSpace(os.Getenv("MULTICA_PI_MODEL")),
 		}
 	}
+	cursorPath := envOrDefault("MULTICA_CURSOR_PATH", "cursor-agent")
+	if _, err := exec.LookPath(cursorPath); err == nil {
+		agents["cursor"] = AgentEntry{
+			Path:  cursorPath,
+			Model: strings.TrimSpace(os.Getenv("MULTICA_CURSOR_MODEL")),
+		}
+	}
+	copilotPath := envOrDefault("MULTICA_COPILOT_PATH", "copilot")
+	if _, err := exec.LookPath(copilotPath); err == nil {
+		agents["copilot"] = AgentEntry{
+			Path:  copilotPath,
+			Model: strings.TrimSpace(os.Getenv("MULTICA_COPILOT_MODEL")),
+		}
+	}
 	if len(agents) == 0 {
-		return Config{}, fmt.Errorf("no agent CLI found: install claude, codex, opencode, openclaw, hermes, gemini, or pi and ensure it is on PATH")
+		return Config{}, fmt.Errorf("no agent CLI found: install claude, codex, copilot, opencode, openclaw, hermes, gemini, pi, or cursor-agent and ensure it is on PATH")
 	}
 
 	// Host info

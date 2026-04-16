@@ -13,8 +13,10 @@ import (
 //
 // Claude:   skills → {workDir}/.claude/skills/{name}/SKILL.md  (native discovery)
 // Codex:    skills → handled separately in Prepare via codex-home
+// Copilot:  skills → {workDir}/.agent_context/skills/{name}/SKILL.md  (via AGENTS.md references)
 // OpenCode: skills → {workDir}/.config/opencode/skills/{name}/SKILL.md  (native discovery)
 // Pi:       skills → {workDir}/.pi/agent/skills/{name}/SKILL.md  (native discovery)
+// Cursor:   skills → {workDir}/.cursor/skills/{name}/SKILL.md  (native discovery)
 // Default:  skills → {workDir}/.agent_context/skills/{name}/SKILL.md
 func writeContextFiles(workDir, provider string, ctx TaskContextForEnv) error {
 	contextDir := filepath.Join(workDir, ".agent_context")
@@ -58,6 +60,9 @@ func resolveSkillsDir(workDir, provider string) (string, error) {
 	case "pi":
 		// Pi natively discovers skills from .pi/agent/skills/ in the workdir.
 		skillsDir = filepath.Join(workDir, ".pi", "agent", "skills")
+	case "cursor":
+		// Cursor natively discovers skills from .cursor/skills/ in the workdir.
+		skillsDir = filepath.Join(workDir, ".cursor", "skills")
 	default:
 		// Fallback: write to .agent_context/skills/ (referenced by meta config).
 		skillsDir = filepath.Join(workDir, ".agent_context", "skills")
